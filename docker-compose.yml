@@ -1,6 +1,7 @@
-# Local copy of the cloud architecture: load balancer -> N app servers -> PostgreSQL.
-# Scale the app tier up or down while it runs:
-#   docker compose up -d --scale app=5
+# Local copy of the cloud architecture: load balancer -> N app servers -> PostgreSQL (+ Redis for rate limits).
+#   cp .env.example .env      # then edit secrets
+#   docker compose up --build
+#   docker compose up -d --scale app=5     # scale the app tier while it runs
 services:
   db:
     image: postgres:16-alpine
@@ -15,15 +16,28 @@ services:
       interval: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+
   app:
     build: .
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://buspass:buspass@db:5432/buspass
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      CONDUCTOR_KEY: ${CONDUCTOR_KEY:-conductor-dev-key}
+      RATELIMIT_STORAGE_URI: redis://redis:6379
+      DEMO_MODE: ${DEMO_MODE:-1}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-0123456789abcdef}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+    volumes:
+      - uploads:/app/instance/uploads
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     deploy:
       replicas: 3
 
@@ -38,3 +52,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

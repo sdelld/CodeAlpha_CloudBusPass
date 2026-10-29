@@ -13,3 +13,4 @@ stripe==16.0.1
 requests>=2.32
 tzdata==2026.2
 gunicorn==23.0.0
+redis>=5.0

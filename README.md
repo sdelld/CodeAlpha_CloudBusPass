@@ -1,95 +1,172 @@
-# CodeAlpha — Task 3: Cloud-Based Bus Pass System
+# CloudBus Pass
 
-An online bus ticket and pass booking system built to run on the cloud behind a load balancer, with
-auto-scaling app servers and a managed PostgreSQL database.
+**Bus passes on your phone — no queues, no paper, no fraud.**
+A cloud-hosted ticketing platform for riders, bus conductors, operators and university/company sponsors.
+Built for CodeAlpha Cloud Computing (Task 3: Cloud-Based Bus Pass System) and grown into an investor-ready product.
 
-**Stack:** Python · Flask · SQLAlchemy · PostgreSQL (SQLite locally) · Gunicorn · Docker · Nginx · AWS Elastic Beanstalk (auto scaling)
+- **Riders** buy daily / weekly / monthly / semester passes or pay per ride from a wallet, show a rotating QR code
+  that works offline, track buses live, and get student/senior discounts — in English or Arabic (full RTL), light or dark.
+- **Conductors** scan with the phone camera and see VALID / EXPIRED / FRAUD instantly, even without internet.
+- **Operators** manage routes, stops, buses, fares and discounts, issue refunds, and watch revenue, rides and fraud live.
+- **Universities & companies** buy seats in bulk and share one invite code with their members.
 
-## How each requirement is met
+Business model, pricing, KPIs and user stories: [docs/BUSINESS_MODEL.md](docs/BUSINESS_MODEL.md) ·
+Audit of the v0.1 prototype: [docs/AUDIT.md](docs/AUDIT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
-| Requirement | How |
-|---|---|
-| Online booking hosted on the cloud | Flask web app + JSON API, containerised with Docker, deployable to AWS Elastic Beanstalk / Google Cloud Run / Render |
-| **Prevent ticket loss** | Tickets are stored in the passenger's account, not on paper. They can be reopened from any device at any time. |
-| **Prevent ticket theft / forgery** | Each QR code holds `BP1.<random id>.<HMAC-SHA256 signature>`. The signature covers owner, route, dates and price, keyed with a server secret, so forged or edited tickets are rejected. Single-ride tickets are **single-use**: the first scan marks them used. A lost or stolen ticket can be **reported**: the old QR code is blocked immediately and a free replacement is issued. The conductor sees the passenger's name on every scan. |
-| **Prevent incorrect pricing** | Prices are computed **only on the server** from the fare table (`pricing.py`) using integer cents (no float rounding errors). Any price sent by the browser is ignored, and the price is part of the signed ticket. |
-| No double booking / overselling | Idempotency key per booking form (double clicks create one ticket), and a database row lock on the route while checking seat capacity, so two buyers can't take the last seat at once. |
-| Handle high traffic with dynamically provisioned servers | The app is **stateless** (sessions in signed cookies, data in Postgres), so any number of identical containers can run behind a load balancer. `.ebextensions/01-autoscaling.config` gives AWS a group of **2–8 servers** that grows above 60% CPU and shrinks below 25%. Locally, `docker compose up --scale app=5` does the same by hand. |
-| Scalability & reliability vs traditional sites | Minimum 2 servers across availability zones, `/healthz` health checks so the load balancer replaces failed servers, rolling zero-downtime deploys, DB connection health checks (`pool_pre_ping`). |
-| Test and deploy | 14 automated tests (`pytest`) + a Locust load test (`locustfile.py`). |
+## Demo accounts
+
+All demo accounts use the password **`Demo@12345`** (seeded by `flask init-db` / `flask seed` in demo mode).
+
+| Role | Login | Open |
+|---|---|---|
+| Rider (monthly pass, 250 EGP wallet) | `rider@cloudbus.test` | `/app` |
+| Student (approved 40% discount, semester pass) | `student@cu.test` | `/app` |
+| Senior (discount pending review) | `senior@cloudbus.test` | `/app` |
+| Conductor / validator | `validator@cloudbus.test` | `/validator` |
+| Operator admin | `admin@cloudbus.test` | `/admin` |
+| University sponsor (Cairo University) | `sponsor@cu.test` | `/sponsor` |
+
+Promo codes: `WELCOME20` (−20%), `CAMPUS50` (−50 EGP), `SUMMER10` (expired). Sponsor invite code: `CUFALL26`
+(only for `@cu.test` emails). In demo mode the one-time login code is shown on screen and card payments go through
+a local test checkout.
 
 ## Architecture
 
-```
-Passengers ──► Load balancer (AWS ALB / nginx)
-                    │
-         ┌──────────┼──────────┐        auto scaling group: 2..8 instances
-         ▼          ▼          ▼
-      app #1     app #2  ...  app #N    Flask + Gunicorn in Docker (stateless)
-         └──────────┼──────────┘
-                    ▼
-          PostgreSQL (AWS RDS)          users, routes, tickets
+```mermaid
+flowchart LR
+    subgraph Clients
+        R[Rider web app<br/>/app · offline QR]
+        V[Validator app<br/>/validator · camera + offline queue]
+        A[Admin dashboard<br/>/admin]
+        S[Sponsor portal<br/>/sponsor]
+    end
+    LB[Load balancer<br/>Render / AWS ALB / nginx]
+    subgraph App["Stateless app tier (auto-scaled, N instances)"]
+        API["/api/v1 · flask-smorest<br/>validation + OpenAPI"]
+        SVC[Services<br/>auth · passes · wallet · payments<br/>validation · analytics · sponsors]
+        REPO[Repositories]
+        API --> SVC --> REPO
+    end
+    DB[(PostgreSQL)]
+    RL[(Redis<br/>rate limits)]
+    PAY[Payment provider<br/>Stripe · Paymob · Fawry · mock]
+    R & V & A & S --> LB --> API
+    REPO --> DB
+    API -.-> RL
+    SVC -- checkout --> PAY
+    PAY -- signed webhook --> API
 ```
 
-## Run locally (no Docker)
+```
+buspass/
+  api/v1/        HTTP layer: auth, rider (me, catalog, passes), operations (payments, validator, sponsor, admin), schemas
+  services/      business logic: auth, pricing, passes, wallet, qr, validation, payments, catalog, sponsors, accounts, analytics, admin, audit, notify
+  payments/      provider interface + mock, Stripe, Paymob, Fawry adapters
+  repositories.py  all database queries        models.py  SQLAlchemy schema
+  config.py · security.py · errors.py · logging_setup.py · cli.py · seed.py · web.py
+migrations/      Alembic migrations          templates/ · static/   landing page + 4 web apps (vanilla JS, no build step)
+tests/           unit (services), integration (API), e2e (Playwright browser)
+docs/            audit, roadmap, business model
+```
 
+### How the hard problems are solved
+
+| Problem | Solution |
+|---|---|
+| **Screenshot / shared passes** | QR = `CB1.<kind>.<id>.<30-second window>.<HMAC-SHA256>`. The phone computes it with a per-pass secret (Web Crypto), so it changes every 30 s and works offline. The server rejects codes older than ~1 minute, codes older than the last accepted one (replay), and the same pass on a different bus within 10 minutes (anti-passback). |
+| **Lost / stolen phone** | Passes live in the account. "Block old codes" rotates the per-pass and wallet secrets, so the old device's codes stop working at once. |
+| **Wrong pricing** | Prices come only from the server's fare table (integer piastres): base × pass multiplier → student/senior discount → promo code. Unknown fields such as `price_cents` are rejected by validation. |
+| **Double charges** | Every purchase and checkout carries an idempotency key (unique per user). Webhooks are processed exactly once per `(provider, event_id)`, and the amount must match. |
+| **Overselling single tickets** | Row lock on the route while checking daily capacity. |
+| **High traffic** | Stateless instances (JWT, no server sessions) behind a load balancer; migrations run under a PostgreSQL advisory lock so many instances can boot at once; Redis-backed rate limits; health checks for auto-scaling. |
+| **No signal on the bus** | Rider app shell cached by a service worker + pass secrets cached on the device; validator queues scans with their real scan time and syncs them idempotently. |
+
+## Run it
+
+### Locally (SQLite, no Docker)
 ```bash
 pip install -r requirements.txt
 ```
 ```bash
-python app.py
-```
-Open http://127.0.0.1:5000, sign up, book a ticket and open it to see the QR code.
-To try the conductor scanner, go to `/conductor`, use the key `conductor-dev-key` and paste the ticket code
-(shown under "Ticket code" on the ticket page). Scan it twice to see the single-use check.
-
-## Run the scaled version locally (Docker)
-
-```bash
-docker compose up --build --scale app=3
-```
-Open http://localhost:8080. `/healthz` shows which container answered (`instance`), so refreshing it shows
-the load balancer spreading requests.
-
-## Tests
-
-```bash
-python -m pytest -q
-```
-
-Load test (with the Docker setup running):
-```bash
-pip install locust
+flask --app wsgi init-db
 ```
 ```bash
-locust -f locustfile.py --host http://localhost:8080 --users 200 --spawn-rate 20
+flask --app wsgi run
 ```
+Open http://127.0.0.1:5000 (landing page), `/app`, `/validator`, `/admin`, `/sponsor`, and the API docs at
+http://127.0.0.1:5000/api/v1/docs.
 
-## Deploy to AWS (Elastic Beanstalk, free tier eligible)
+### Docker (PostgreSQL + Redis + 3 app servers behind nginx)
+```bash
+docker compose up --build
+```
+Open http://localhost:8080. Scale while it runs: `docker compose up -d --scale app=5`.
+`/healthz` shows which container answered.
 
-1. Install the EB CLI: `pip install awsebcli`, then `aws configure` with your IAM user keys.
-2. In this folder: `eb init -p docker codealpha-buspass` (choose your region).
-3. Create the environment with a Postgres database:
-   `eb create buspass-prod --database.engine postgres --database.username buspass`
-4. Set secrets (Beanstalk exposes the RDS settings; build `DATABASE_URL` from them):
-   `eb setenv SECRET_KEY=<long random string> CONDUCTOR_KEY=<another secret> SESSION_COOKIE_SECURE=1 DATABASE_URL=postgresql://USER:PASS@HOST:5432/ebdb`
-5. `eb open`. Scaling rules come from `.ebextensions/01-autoscaling.config`.
+### Deploy to Render (free)
+Push to GitHub → Render → **New → Blueprint** → pick the repo → **Apply**. `render.yaml` creates the PostgreSQL
+database and the web service, generates the secrets, and runs in demo mode.
 
-**Alternative: Google Cloud Run** (scales from 0 to N automatically per request load):
-`gcloud run deploy buspass --source . --max-instances 10 --set-env-vars SECRET_KEY=...,DATABASE_URL=...`
-(use Cloud SQL, or a free Postgres from Neon/Supabase, for `DATABASE_URL`).
+### Deploy to AWS Elastic Beanstalk (auto-scaling 2–8 instances)
+```bash
+eb init -p docker cloudbus-pass
+```
+```bash
+eb create cloudbus-prod --database.engine postgres
+```
+Then `eb setenv APP_ENV=production SECRET_KEY=... DATABASE_URL=... COOKIE_SECURE=1` (see `.env.example`).
+`.ebextensions/01-autoscaling.config` adds/removes instances on CPU load with `/healthz` health checks.
+
+### Scheduled job
+Run `flask --app wsgi daily-jobs` once a day (e.g. 00:05 Cairo time — a Render Cron Job, EventBridge, or cron).
+It auto-renews passes from the wallet, expires old passes, and sends "expires today" reminders.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `flask --app wsgi init-db` | Run migrations; seed demo data if the DB is empty and `DEMO_MODE=1` |
+| `flask --app wsgi seed --reset` | Recreate the demo data (refuses in production) |
+| `flask --app wsgi daily-jobs` | Renewals, expiry, reminders |
+| `flask --app wsgi db migrate -m "..."` / `db upgrade` | Create / apply a migration after changing models |
+| `python -m pytest` | Unit + integration tests (and browser E2E when Playwright is installed) |
+| `python -m ruff check . && python -m ruff format --check .` | Lint + format check |
+| `locust -f locustfile.py --host http://localhost:8080` | Load test |
+
+Dev tools: `pip install -r requirements-dev.txt && python -m playwright install chromium`.
 
 ## Configuration
 
-| Variable | Default | Purpose |
+All settings are environment variables — see [.env.example](.env.example).
+
+| Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///buspass.db` | Postgres URL in the cloud |
-| `SECRET_KEY` | dev value | Signs sessions **and tickets**. Must be the same on every server and kept secret. |
-| `CONDUCTOR_KEY` | `conductor-dev-key` | Key for the ticket scanner API |
-| `CURRENCY` | `USD` | Display currency |
-| `SESSION_COOKIE_SECURE` | off | Set to `1` behind HTTPS |
+| `APP_ENV` | `development` | `production` refuses to start with development secrets |
+| `SECRET_KEY` | dev value | Signs OTP hashes; also the JWT key if `JWT_SECRET` is unset |
+| `JWT_SECRET` | `SECRET_KEY` | Access/refresh token signing |
+| `DATABASE_URL` | `sqlite:///buspass.db` | PostgreSQL in the cloud |
+| `DEMO_MODE` | on outside production | OTP shown on screen, demo seed, test checkout |
+| `PAYMENT_PROVIDER` | `mock` | `stripe` (test keys), `paymob`, `fawry` |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | — | Stripe test mode: `sk_test_…`, `whsec_…`; webhook URL `/api/v1/payments/webhooks/stripe` |
+| `TIMEZONE` / `CURRENCY` | `Africa/Cairo` / `EGP` | Validity dates follow local time |
+| `QR_WINDOW_SECONDS` / `ANTI_PASSBACK_MINUTES` | `30` / `10` | QR rotation and reuse rules |
+| `RATELIMIT_STORAGE_URI` | `memory://` | `redis://…` when running several instances |
+| `COOKIE_SECURE` | on in production | Secure refresh-token cookie + HSTS |
 
-## Notes
+## API
 
-Payment is simulated. A real deployment would plug in a payment provider (e.g. Stripe or Paymob) before
-`issue_ticket` and only issue the ticket after the payment succeeds.
+Versioned REST API under `/api/v1`, documented with OpenAPI at **`/api/v1/docs`** (Swagger UI) and
+`/api/v1/openapi.json`. Authenticate with `POST /api/v1/auth/login` (or OTP), then send
+`Authorization: Bearer <access_token>`; refresh with `POST /api/v1/auth/refresh` (httpOnly cookie or body).
+Errors always look like `{"error": {"code": "...", "message": "...", "details": {...}}}`.
+
+## Security notes
+Argon2 password hashing · 15-minute access tokens + rotating refresh tokens with reuse detection · role-based access
+(rider / validator / admin / sponsor) · rate limits on login, OTP and scanning · marshmallow validation rejecting unknown
+fields on every endpoint · OTP codes hashed, 5-minute expiry, 5 attempts · upload type checked by file signature ·
+CSV exports escape spreadsheet formulas · CSP, HSTS, X-Frame-Options, nosniff · audit log of every admin action and scan ·
+structured JSON logs with request ids.
+
+## Remaining work
+See [docs/ROADMAP.md](docs/ROADMAP.md) — mainly real SMS/email delivery for OTP, live payment-provider credentials,
+a GPS feed instead of simulated buses, push notifications, and offline signature checks on validator devices.

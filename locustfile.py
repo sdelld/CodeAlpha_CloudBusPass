@@ -1,60 +1,70 @@
-"""High-traffic load test.
+"""Load test against the v1 API (run with the docker-compose stack, demo data loaded).
 
     pip install locust
     locust -f locustfile.py --host http://localhost:8080 --users 200 --spawn-rate 20
 
-Open http://localhost:8089 to watch requests/sec and latency while you scale the app tier.
+Riders browse routes, get quotes and open their passes; conductors validate scans.
+Rate limits are per client IP, so run with RATELIMIT_ENABLED=0 (or from several machines) for big loads.
 """
 
 import random
-import re
 import uuid
 
 from locust import HttpUser, between, task
 
+PASSWORD = "Demo@12345"
 
-class Passenger(HttpUser):
+
+class Rider(HttpUser):
+    weight = 5
     wait_time = between(1, 3)
 
     def on_start(self):
-        self.client.get("/register")
-        token = self._csrf("/register")
-        self.client.post(
-            "/register",
-            data={
-                "csrf_token": token,
-                "name": "Load Tester",
-                "email": f"load-{uuid.uuid4().hex[:12]}@example.com",
-                "password": "password123",
-            },
-        )
-
-    def _csrf(self, path):
-        html = self.client.get(path, name=path).text
-        m = re.search(r'name="csrf_token" value="([^"]+)"', html)
-        return m.group(1) if m else ""
+        r = self.client.post("/api/v1/auth/login", json={"identifier": "rider@cloudbus.test", "password": PASSWORD})
+        self.headers = {"Authorization": f"Bearer {r.json().get('access_token', '')}"}
 
     @task(5)
-    def browse_routes(self):
-        self.client.get("/api/routes")
+    def routes(self):
+        self.client.get("/api/v1/routes")
 
     @task(3)
-    def get_quote(self):
-        self.client.get(f"/api/quote?route_id={random.randint(1, 6)}&pass_type=single", name="/api/quote")
+    def quote(self):
+        self.client.get(f"/api/v1/passes/quote?route_id={random.randint(1, 6)}&pass_type=monthly", name="/passes/quote")
+
+    @task(3)
+    def live(self):
+        self.client.get(f"/api/v1/routes/{random.randint(1, 6)}/live", name="/routes/:id/live")
+
+    @task(4)
+    def my_passes(self):
+        self.client.get("/api/v1/passes", headers=self.headers)
 
     @task(1)
-    def book(self):
-        html = self.client.get("/book").text
-        token = re.search(r'name="csrf_token" value="([^"]+)"', html).group(1)
-        key = re.search(r'name="idempotency_key" value="([^"]+)"', html).group(1)
-        day = re.search(r'name="travel_date"[^>]*value="([^"]+)"', html).group(1)
+    def buy_daily(self):
         self.client.post(
-            "/book",
-            data={
-                "csrf_token": token,
-                "idempotency_key": key,
-                "route_id": random.randint(1, 6),
-                "pass_type": random.choice(["single", "day", "weekly"]),
-                "travel_date": day,
-            },
+            "/api/v1/passes",
+            headers=self.headers,
+            name="/passes [buy]",
+            json={"route_id": 5, "pass_type": "single", "idempotency_key": uuid.uuid4().hex},
+        )
+
+
+class Conductor(HttpUser):
+    weight = 1
+    wait_time = between(0.5, 2)
+
+    def on_start(self):
+        r = self.client.post("/api/v1/auth/login", json={"identifier": "validator@cloudbus.test", "password": PASSWORD})
+        self.headers = {"Authorization": f"Bearer {r.json().get('access_token', '')}"}
+        buses = self.client.get("/api/v1/validator/buses", headers=self.headers).json().get("items", [])
+        self.bus_id = buses[0]["id"] if buses else 1
+
+    @task
+    def scan(self):
+        # Unknown codes still exercise the full validation path (parse, lookup, audit write).
+        self.client.post(
+            "/api/v1/validator/scan",
+            headers=self.headers,
+            name="/validator/scan",
+            json={"token": f"CB1.P.{uuid.uuid4().hex}.1.{'0' * 20}", "bus_id": self.bus_id},
         )

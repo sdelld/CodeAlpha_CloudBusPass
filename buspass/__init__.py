@@ -19,8 +19,12 @@ CSP = (
 
 def create_app(overrides=None):
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    app = Flask(__name__, instance_relative_config=True, template_folder=os.path.join(root, "templates"),
-                static_folder=os.path.join(root, "static"))
+    app = Flask(
+        __name__,
+        instance_relative_config=True,
+        template_folder=os.path.join(root, "templates"),
+        static_folder=os.path.join(root, "static"),
+    )
     app.config.from_object(Config)
     if overrides:
         app.config.update(overrides)

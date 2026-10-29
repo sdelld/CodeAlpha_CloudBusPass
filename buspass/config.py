@@ -45,7 +45,10 @@ class Config:
     PAYMOB_INTEGRATION_ID = os.environ.get("PAYMOB_INTEGRATION_ID", "")
     FAWRY_MERCHANT_CODE = os.environ.get("FAWRY_MERCHANT_CODE", "")
     FAWRY_SECURITY_KEY = os.environ.get("FAWRY_SECURITY_KEY", "")
-    PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:5000")
+    # Render sets RENDER_EXTERNAL_URL automatically.
+    PUBLIC_BASE_URL = (
+        os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:5000"
+    )
 
     QR_WINDOW_SECONDS = int(os.environ.get("QR_WINDOW_SECONDS", "30"))
     QR_ALLOWED_DRIFT_WINDOWS = int(os.environ.get("QR_ALLOWED_DRIFT_WINDOWS", "1"))

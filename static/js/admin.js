@@ -1,7 +1,7 @@
 /* Operator dashboard. */
 (function () {
   "use strict";
-  const { h, t, api, money, dateTime, loc, toast, view, field, onSubmit, go, route, empty, mount, modal, confirmDialog } = CB;
+  const { h, t, api, money, dateTime, loc, toast, view, field, onSubmit, route, empty, mount, modal, confirmDialog } = CB;
   const root = document.getElementById("app");
   let me = null;
   let currency = "EGP";

@@ -1,4 +1,4 @@
-# Render Blueprint: New > Blueprint > pick this repo. Creates the database and the web service.
+# Render Blueprint: New > Blueprint > pick this repo. Creates the database and the web service (free plans).
 databases:
   - name: buspass-db
     plan: free
@@ -18,7 +18,17 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      - key: CONDUCTOR_KEY
+      - key: JWT_SECRET
         generateValue: true
-      - key: SESSION_COOKIE_SECURE
+      - key: MOCK_WEBHOOK_SECRET
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      # Demo deployment: seeds demo data, shows OTP codes on screen, uses the test checkout.
+      # For a real launch set DEMO_MODE=0 and PAYMENT_PROVIDER=stripe|paymob|fawry with real keys.
+      - key: DEMO_MODE
         value: "1"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: WEB_CONCURRENCY
+        value: "2"
