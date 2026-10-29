@@ -359,66 +359,72 @@ def seed_demo(n_riders=120, days=30, rng_seed=7):
         price = route.base_fare_cents * pt.multiplier_num // pt.multiplier_den
         if u.discount_status == "approved":
             price = price * 60 // 100
-        p = Pass(
-            user=u,
-            route=route,
-            pass_type=pt,
-            valid_from=start,
-            valid_until=start + timedelta(days=pt.validity_days - 1),
-            price_cents=price,
-            status="active" if start + timedelta(days=pt.validity_days - 1) >= today else "expired",
-            auto_renew=product == "monthly" and rng.random() < 0.4,
-        )
-        db.session.add(p)
-        db.session.flush()
-        bought_at = _utc(start, rng.randint(6, 22), rng.randint(0, 59))
-        method = rng.choice(["card", "card", "wallet"])
-        pay_id = None
-        if method == "card":
-            pay = Payment(
-                user_id=u.id,
-                purpose="pass",
-                amount_cents=price,
-                currency="EGP",
-                provider="mock",
-                provider_ref=f"mock_seed_{p.id[:10]}",
-                status="succeeded",
-                idempotency_key=f"seed-{p.id}",
-                meta={"description": f"{pt.name_en} — {route.code}"},
-                created_at=bought_at,
-                completed_at=bought_at,
+        while True:
+            p = Pass(
+                user=u,
+                route=route,
+                pass_type=pt,
+                valid_from=start,
+                valid_until=start + timedelta(days=pt.validity_days - 1),
+                price_cents=price,
+                status="active" if start + timedelta(days=pt.validity_days - 1) >= today else "expired",
+                auto_renew=product == "monthly" and rng.random() < 0.4,
             )
-            db.session.add(pay)
+            db.session.add(p)
             db.session.flush()
-            pay_id = p.payment_id = pay.id
-        _receipt(
-            u.id,
-            f"{pt.name_en} — {route.code} {route.name_en}",
-            price,
-            method,
-            bought_at,
-            pass_id=p.id,
-            payment_id=pay_id,
-        )
-        bus_choices = [b for b in buses if b.route is route]
-        last_day = min(today, p.valid_until)
-        day = start
-        while day <= last_day:
-            if day.weekday() != 4 and rng.random() < 0.75:  # fewer rides on Fridays
-                for _ in range(rng.choice([1, 2, 2])):
-                    hour = rng.choice(peak_hours)
-                    db.session.add(
-                        Ride(
-                            pass_id=p.id,
-                            user_id=u.id,
-                            validator_id=validator.id,
-                            bus=rng.choice(bus_choices),
-                            route=route,
-                            result="valid",
-                            scanned_at=_utc(day, hour, rng.randint(0, 59)),
+            bought_at = _utc(start, rng.randint(6, 22), rng.randint(0, 59))
+            method = rng.choice(["card", "card", "wallet"])
+            pay_id = None
+            if method == "card":
+                pay = Payment(
+                    user_id=u.id,
+                    purpose="pass",
+                    amount_cents=price,
+                    currency="EGP",
+                    provider="mock",
+                    provider_ref=f"mock_seed_{p.id[:10]}",
+                    status="succeeded",
+                    idempotency_key=f"seed-{p.id}",
+                    meta={"description": f"{pt.name_en} — {route.code}"},
+                    created_at=bought_at,
+                    completed_at=bought_at,
+                )
+                db.session.add(pay)
+                db.session.flush()
+                pay_id = p.payment_id = pay.id
+            _receipt(
+                u.id,
+                f"{pt.name_en} — {route.code} {route.name_en}",
+                price,
+                method,
+                bought_at,
+                pass_id=p.id,
+                payment_id=pay_id,
+            )
+            bus_choices = [b for b in buses if b.route is route]
+            last_day = min(today, p.valid_until)
+            day = start
+            while day <= last_day:
+                if day.weekday() != 4 and rng.random() < 0.75:  # fewer rides on Fridays
+                    for _ in range(rng.choice([1, 2, 2])):
+                        hour = rng.choice(peak_hours)
+                        db.session.add(
+                            Ride(
+                                pass_id=p.id,
+                                user_id=u.id,
+                                validator_id=validator.id,
+                                bus=rng.choice(bus_choices),
+                                route=route,
+                                result="valid",
+                                scanned_at=_utc(day, hour, rng.randint(0, 59)),
+                            )
                         )
-                    )
-            day += timedelta(days=1)
+                day += timedelta(days=1)
+            next_start = p.valid_until + timedelta(days=1)
+            # Most riders renew when a weekly+ pass runs out (keeps the churn KPI realistic).
+            if next_start > today or pt.validity_days < 7 or rng.random() > 0.7:
+                break
+            start = next_start
 
     # Pay-per-ride wallet scans + a sprinkling of rejected scans (fraud/expired) for the scan-result chart.
     for _ in range(400):

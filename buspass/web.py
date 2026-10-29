@@ -46,6 +46,7 @@ def service_worker():
     # Served from /app/ so its scope covers the rider app; caches the shell for offline passes.
     resp = send_from_directory(current_app.static_folder, "js/sw.js", mimetype="application/javascript")
     resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["Service-Worker-Allowed"] = "/app"
     return resp
 
 
@@ -77,7 +78,7 @@ def mock_checkout(payment_id):
         # Exactly what a real gateway does: a signed server-to-server webhook.
         payments.handle_webhook("mock", body, {"X-Mock-Signature": signature})
         db.session.refresh(payment)
-        return redirect(f"/app#/payment/{payment.id}")
+        return redirect("/sponsor" if payment.purpose == "sponsor_seats" else f"/app#/payment/{payment.id}")
     return render_template(
         "mock_checkout.html", payment=payment, amount=format_money(payment.amount_cents, payment.currency)
     )

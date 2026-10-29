@@ -1,0 +1,118 @@
+{%- set ar = lang == 'ar' -%}
+{%- macro tr(en, ar_text) -%}{{ ar_text if ar else en }}{%- endmacro -%}
+{%- macro egp(cents) -%}{{ '{:,.0f}'.format(cents / 100) }} {{ 'ج.م' if ar else currency }}{%- endmacro -%}
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ 'rtl' if ar else 'ltr' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ tr('CloudBus Pass — bus passes on your phone', 'كلاود باص — اشتراك الأتوبيس على موبايلك') }}</title>
+  <meta name="description" content="{{ tr('Buy bus passes in seconds, show a fraud-proof rotating QR code, track your bus live. For riders, universities and bus operators in Egypt.', 'اشترِ اشتراك الأتوبيس في ثوانٍ واعرض رمز QR آمن وتابع الأتوبيس مباشرة. للركاب والجامعات وشركات النقل في مصر.') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
+</head>
+<body>
+<header>
+  <nav class="site-nav" aria-label="Main">
+    <a class="logo" href="/"><span aria-hidden="true">🚌</span> {{ tr('CloudBus Pass', 'كلاود باص') }}</a>
+    <div class="row wrap">
+      <a class="btn ghost sm" href="#pricing">{{ tr('Pricing', 'الأسعار') }}</a>
+      <a class="btn ghost sm" href="#business">{{ tr('For universities', 'للجامعات') }}</a>
+      <a class="btn ghost sm" href="?lang={{ 'en' if ar else 'ar' }}" hreflang="{{ 'en' if ar else 'ar' }}">{{ 'English' if ar else 'العربية' }}</a>
+      <a class="btn sm" href="/app">{{ tr('Open app', 'افتح التطبيق') }}</a>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="section hero">
+    <div class="stack-lg">
+      <span class="badge brand">{{ tr('Now live in Greater Cairo', 'متاح الآن في القاهرة الكبرى') }}</span>
+      <h1>{{ tr('Your bus pass, on your phone. No queues, no paper, no fraud.', 'اشتراك الأتوبيس على موبايلك. بلا طوابير ولا ورق ولا تزوير.') }}</h1>
+      <p class="lead">{{ tr('Buy daily, weekly, monthly or semester passes in seconds. Show a live QR code that changes every 30 seconds — even offline. See where your bus is right now.', 'اشترِ اشتراكًا يوميًا أو أسبوعيًا أو شهريًا أو للفصل الدراسي في ثوانٍ. اعرض رمز QR يتغير كل 30 ثانية — حتى بدون إنترنت. واعرف مكان الأتوبيس الآن.') }}</p>
+      <div class="row wrap">
+        <a class="btn" href="/app#/register">{{ tr('Get your pass', 'احصل على اشتراكك') }}</a>
+        <a class="btn secondary" href="#how">{{ tr('How it works', 'كيف يعمل') }}</a>
+      </div>
+      <p class="small muted">{{ tr('From', 'يبدأ من') }} {{ egp(min_fare) }} {{ tr('per ride', 'للرحلة') }} · {{ tr('Student & senior discounts up to 50%', 'خصومات للطلاب وكبار السن حتى 50%') }}</p>
+    </div>
+    <div class="phone" aria-hidden="true">
+      <div class="screen-mock stack">
+        <div class="pass-card" style="--route:#059669">
+          <span class="route-code">R3</span>
+          <h2>{{ tr('Monthly pass', 'اشتراك شهري') }}</h2>
+          <div>{{ tr('Ramses – New Cairo (AUC)', 'رمسيس – القاهرة الجديدة') }}</div>
+          <div class="qr-wrap">
+            <svg viewBox="0 0 21 21" width="170" height="170" shape-rendering="crispEdges">
+              <rect width="21" height="21" fill="#fff"/>
+              <path fill="#0f172a" d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2zM14 0h7v7h-7zM15 1v5h5V1zM16 2h3v3h-3zM0 14h7v7H0zM1 15v5h5v-5zM2 16h3v3H2zM8 0h2v2H8zM11 1h2v3h-2zM8 4h3v2H8zM9 8h3v2H9zM13 8h2v3h-2zM16 8h3v2h-3zM8 11h2v3H8zM11 12h3v2h-3zM15 12h2v2h-2zM18 11h3v3h-3zM9 16h2v3H9zM12 15h3v2h-3zM16 15h2v4h-2zM19 16h2v2h-2zM12 18h3v3h-3zM0 8h2v2H0zM3 9h3v2H3zM0 12h4v1H0z"/>
+            </svg>
+            <div class="qr-timer"><i style="width:60%"></i></div>
+            <div class="small"><span class="live-dot"></span> {{ tr('Code refreshes in 18s', 'يتجدد الرمز خلال 18 ث') }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <h2>{{ tr('How it works', 'كيف يعمل') }}</h2>
+    <div class="steps">
+      <div class="card"><h3>{{ tr('Sign up in 30 seconds', 'سجّل في 30 ثانية') }}</h3><p class="muted">{{ tr('Email or phone with a one-time code. Students and seniors upload an ID once for automatic discounts.', 'بالبريد أو الموبايل برمز لمرة واحدة. الطلاب وكبار السن يرفعون البطاقة مرة واحدة للحصول على الخصم تلقائيًا.') }}</p></div>
+      <div class="card"><h3>{{ tr('Buy or top up', 'اشترِ أو اشحن') }}</h3><p class="muted">{{ tr('Pay by card or from your wallet. Turn on auto-renew and never think about it again.', 'ادفع بالبطاقة أو من المحفظة. فعّل التجديد التلقائي ولا تفكر فيه مرة أخرى.') }}</p></div>
+      <div class="card"><h3>{{ tr('Tap “Pass” and board', 'اضغط «الاشتراك» واركب') }}</h3><p class="muted">{{ tr('The conductor scans your live QR. Screenshots don’t work, so passes can’t be shared or stolen.', 'المحصّل يمسح رمزك الحي. لقطات الشاشة لا تعمل، فلا يمكن مشاركة الاشتراك أو سرقته.') }}</p></div>
+      <div class="card"><h3>{{ tr('Track your bus', 'تابع الأتوبيس') }}</h3><p class="muted">{{ tr('Live positions, next departures and delay alerts for the routes you ride.', 'مواقع مباشرة والمواعيد القادمة وتنبيهات التأخير لخطوطك.') }}</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="pricing">
+    <h2>{{ tr('Simple pricing', 'أسعار بسيطة') }}</h2>
+    <p class="muted">{{ tr('Prices depend on the route. Example: route R1 (Ramses – Cairo University).', 'السعر حسب الخط. مثال: خط R1 (رمسيس – جامعة القاهرة).') }}</p>
+    {%- set r1 = routes | selectattr('code', 'equalto', 'R1') | first -%}
+    {%- set base = r1.base_fare_cents if r1 else 1200 -%}
+    <div class="pricing">
+      {% for pt in pass_types %}
+      <div class="card stack {{ 'featured' if pt.code == 'monthly' }}">
+        {% if pt.code == 'monthly' %}<span class="badge brand">{{ tr('Most popular', 'الأكثر شيوعًا') }}</span>{% endif %}
+        <h3>{{ pt.name_ar if ar else pt.name_en }}</h3>
+        <div class="price num">{{ egp(base * pt.multiplier_num // pt.multiplier_den) }}</div>
+        <div class="small muted">{{ pt.validity_days }} {{ tr('day(s)', 'يوم') }} · {{ tr('one ride', 'رحلة واحدة') if pt.max_rides == 1 else tr('unlimited rides', 'رحلات غير محدودة') }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="small muted" style="margin-top:12px">{{ tr('Students −40% · Seniors −50% · Pay-per-ride from wallet at the single fare.', 'الطلاب −40% · كبار السن −50% · الدفع لكل رحلة من المحفظة بسعر التذكرة الواحدة.') }}</p>
+  </section>
+
+  <section class="section" id="business">
+    <div class="b2b stack-lg">
+      <h2>{{ tr('For universities and companies', 'للجامعات والشركات') }}</h2>
+      <p>{{ tr('Buy commuter seats in bulk at volume prices, share one invite code with students or staff, and see exactly who rides. Operators get a validator app, live dashboard, fraud reports and refunds in one place.', 'اشترِ مقاعد بالجملة بأسعار مخفضة، وشارك كود دعوة واحد مع الطلاب أو الموظفين، واعرف بالضبط من يستخدم الخدمة. وشركات النقل تحصل على تطبيق للمحصّل ولوحة تحكم مباشرة وتقارير احتيال واسترداد في مكان واحد.') }}</p>
+      <div class="grid grid-2">
+        <div><b>{{ tr('Sponsors', 'الجهات الراعية') }}</b><p>{{ tr('Seats from 30× the single fare per month · minimum 10 seats · utilisation report', 'المقعد من 30× سعر التذكرة شهريًا · حد أدنى 10 مقاعد · تقرير استخدام') }}</p></div>
+        <div><b>{{ tr('Operators', 'شركات النقل') }}</b><p>{{ tr('From 400 EGP per bus per month + 2.5% of fares', 'من 400 جنيه للأتوبيس شهريًا + 2.5% من الأجرة') }}</p></div>
+      </div>
+      <div class="row wrap"><a class="btn" href="/sponsor">{{ tr('Organisation portal', 'بوابة المؤسسات') }}</a><a class="btn" href="/admin">{{ tr('Operator dashboard', 'لوحة شركة النقل') }}</a></div>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <h2>{{ tr('Questions', 'أسئلة شائعة') }}</h2>
+    <details class="faq"><summary>{{ tr('What if my phone has no internet on the bus?', 'ماذا لو لم يكن هناك إنترنت في الأتوبيس؟') }}</summary><p class="muted">{{ tr('Your pass keeps working. The app generates the rotating code on your phone until the pass expires, and the conductor’s app queues scans offline.', 'اشتراكك يظل يعمل. التطبيق يولّد الرمز على هاتفك حتى انتهاء الاشتراك، وتطبيق المحصّل يحفظ عمليات المسح بدون إنترنت.') }}</p></details>
+    <details class="faq"><summary>{{ tr('Can someone use a screenshot of my pass?', 'هل يمكن لأحد استخدام لقطة شاشة لاشتراكي؟') }}</summary><p class="muted">{{ tr('No. Codes are cryptographically signed and expire after about a minute, and the same pass can’t be used on two buses at once.', 'لا. الرموز موقّعة رقميًا وتنتهي خلال دقيقة تقريبًا، ولا يمكن استخدام نفس الاشتراك في أتوبيسين في نفس الوقت.') }}</p></details>
+    <details class="faq"><summary>{{ tr('I lost my phone. Is my pass gone?', 'فقدت هاتفي. هل ضاع اشتراكي؟') }}</summary><p class="muted">{{ tr('No — passes live in your account. Log in on a new phone and tap “Block old codes”; the lost phone’s codes stop working immediately.', 'لا — الاشتراك محفوظ في حسابك. سجّل الدخول من هاتف جديد واضغط «إيقاف الرموز القديمة» فتتوقف رموز الهاتف المفقود فورًا.') }}</p></details>
+    <details class="faq"><summary>{{ tr('How do refunds work?', 'كيف يتم الاسترداد؟') }}</summary><p class="muted">{{ tr('If a trip is cancelled or you were charged by mistake, contact support from the app. Refunds go to your wallet instantly or back to your card.', 'إذا أُلغيت رحلة أو تم الخصم بالخطأ، تواصل مع الدعم من التطبيق. يتم الاسترداد للمحفظة فورًا أو للبطاقة.') }}</p></details>
+    <details class="faq"><summary>{{ tr('Which payment methods are supported?', 'ما طرق الدفع المتاحة؟') }}</summary><p class="muted">{{ tr('Cards today; Paymob and Fawry (including cash at Fawry outlets) are integrated and ready to switch on.', 'البطاقات حاليًا؛ وبايموب وفوري (ومنها الدفع النقدي في منافذ فوري) مدمجة وجاهزة للتفعيل.') }}</p></details>
+  </section>
+
+  <section class="section center stack-lg">
+    <h2>{{ tr('Ready to ride?', 'جاهز للركوب؟') }}</h2>
+    <a class="btn" href="/app#/register">{{ tr('Create your free account', 'أنشئ حسابك مجانًا') }}</a>
+  </section>
+</main>
+
+<footer class="section footer row wrap spread">
+  <span>© CloudBus Pass · CodeAlpha Cloud Computing</span>
+  <span class="row wrap"><a href="/api/v1/docs">API</a> <a href="/validator">{{ tr('Validator app', 'تطبيق المحصّل') }}</a> <a href="/admin">{{ tr('Admin', 'الإدارة') }}</a></span>
+</footer>
+</body>
+</html>

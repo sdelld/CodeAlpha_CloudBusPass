@@ -70,12 +70,8 @@ def start_checkout(user, purpose, idempotency_key, amount_cents=None, **params):
         db.session.rollback()
         return repo.Payments.by_idempotency(user.id, idempotency_key)
     base = current_app.config["PUBLIC_BASE_URL"].rstrip("/")
-    session = provider.create_checkout(
-        payment,
-        description,
-        success_url=f"{base}/app#/payment/{payment.id}",
-        cancel_url=f"{base}/app#/payment/{payment.id}",
-    )
+    back = f"{base}/sponsor" if purpose == "sponsor_seats" else f"{base}/app#/payment/{payment.id}"
+    session = provider.create_checkout(payment, description, success_url=back, cancel_url=back)
     payment.provider_ref = session.provider_ref
     payment.meta = {**meta, "checkout_url": session.checkout_url, "description": description}
     db.session.commit()

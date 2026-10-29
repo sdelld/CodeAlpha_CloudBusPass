@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ status }} · CloudBus Pass</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
+</head>
+<body>
+<main class="empty" id="main" style="padding-top:96px">
+  <div class="art">🚏</div>
+  <h1>{{ message }}</h1>
+  <p class="muted">Error {{ status }}</p>
+  <a class="btn" href="/">Home</a>
+</main>
+</body>
+</html>

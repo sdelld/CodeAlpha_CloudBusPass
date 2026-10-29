@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d4ed8">
+  <title>{{ title }}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
+  {# i18n + core run before first paint so language direction and theme are right immediately #}
+  <script src="{{ url_for('static', filename='js/i18n.js', v=asset_version) }}"></script>
+  <script src="{{ url_for('static', filename='js/core.js', v=asset_version) }}"></script>
+</head>
+<body>
+  <a class="sr-only" href="#main">Skip to content</a>
+  <div id="app"><div class="center" style="padding:64px"><span class="spinner" aria-label="Loading"></span></div></div>
+  {% if app == 'rider' %}
+  <script src="{{ url_for('static', filename='vendor/qrcode.js', v=asset_version) }}" defer></script>
+  {% elif app == 'validator' %}
+  <script src="{{ url_for('static', filename='vendor/jsQR.js', v=asset_version) }}" defer></script>
+  {% elif app in ('admin', 'sponsor') %}
+  <script src="{{ url_for('static', filename='vendor/chart.umd.js', v=asset_version) }}" defer></script>
+  {% endif %}
+  <script src="{{ url_for('static', filename='js/' ~ app ~ '.js', v=asset_version) }}" defer></script>
+</body>
+</html>

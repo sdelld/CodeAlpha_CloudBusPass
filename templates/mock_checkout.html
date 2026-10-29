@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test checkout</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
+</head>
+<body>
+<main class="app screen stack-lg" id="main" style="padding-top:48px">
+  <div class="alert warn">TEST MODE — no real money moves. In production this page is your payment provider (Stripe, Paymob or Fawry).</div>
+  <div class="card stack">
+    <div class="small muted">CloudBus Pass</div>
+    <h1 class="num">{{ amount }}</h1>
+    <p>{{ payment.meta.get('description', '') }}</p>
+    {% if payment.status == 'pending' %}
+    <form method="post" class="stack">
+      <label class="field"><span>Card number</span><input class="input mono" value="4242 4242 4242 4242" readonly aria-readonly="true"></label>
+      <button class="btn block ok" name="outcome" value="pay">Pay {{ amount }}</button>
+      <button class="btn block secondary" name="outcome" value="fail">Decline payment</button>
+    </form>
+    {% else %}
+    <div class="alert info">This payment is already {{ payment.status }}.</div>
+    <a class="btn" href="/app#/payment/{{ payment.id }}">Back to app</a>
+    {% endif %}
+  </div>
+</main>
+</body>
+</html>
