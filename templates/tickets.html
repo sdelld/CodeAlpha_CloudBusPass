@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>My tickets</h1>
+{% if not tickets %}
+  <p>No tickets yet. <a href="{{ url_for('book') }}">Book your first trip</a>.</p>
+{% else %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Route</th><th>Type</th><th>Valid</th><th>Price</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for t in tickets %}
+    {% set state = 'expired' if t.status == 'active' and t.valid_until < today else t.status %}
+    <tr>
+      <td>{{ t.route.code }} · {{ t.route.origin }} → {{ t.route.destination }}</td>
+      <td>{{ PASS_TYPES[t.pass_type].label }}</td>
+      <td>{{ t.valid_from }}{% if t.valid_until != t.valid_from %} → {{ t.valid_until }}{% endif %}</td>
+      <td>{{ money(t.price_cents) }}</td>
+      <td><span class="tag {{ state }}">{{ state }}</span></td>
+      <td><a href="{{ url_for('ticket_detail', ticket_id=t.id) }}">Open</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

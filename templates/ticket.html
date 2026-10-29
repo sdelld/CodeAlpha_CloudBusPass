@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel ticket">
+  <div>
+    <h1>{{ PASS_TYPES[ticket.pass_type].label }} · {{ ticket.route.code }}</h1>
+    <p class="big">{{ ticket.route.origin }} → {{ ticket.route.destination }}</p>
+    <dl>
+      <dt>Passenger</dt><dd>{{ ticket.user.name }}</dd>
+      <dt>Departs</dt><dd>{{ ticket.route.departure_time }}</dd>
+      <dt>Valid</dt><dd>{{ ticket.valid_from }}{% if ticket.valid_until != ticket.valid_from %} → {{ ticket.valid_until }}{% endif %}</dd>
+      <dt>Price paid</dt><dd>{{ money(ticket.price_cents) }}</dd>
+      <dt>Status</dt><dd><span class="tag {{ ticket.status }}">{{ ticket.status }}</span></dd>
+      <dt>Ticket ID</dt><dd><code>{{ ticket.id }}</code></dd>
+      {% if ticket.replaces_id %}<dt>Replaces</dt><dd><code>{{ ticket.replaces_id }}</code></dd>{% endif %}
+    </dl>
+  </div>
+  <div class="qr">
+    {% if qr_svg %}
+      {{ qr_svg|safe }}
+      <p class="muted small">Show this QR code to the conductor.</p>
+      <details><summary>Ticket code (for manual entry)</summary><code class="wrap">{{ code }}</code></details>
+      {% if ticket.valid_until >= today %}
+      <form method="post" action="{{ url_for('report_lost', ticket_id=ticket.id) }}"
+            onsubmit="return confirm('Block this ticket and issue a replacement? The current QR code will stop working.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn danger small">Report lost / stolen</button>
+      </form>
+      {% endif %}
+    {% else %}
+      <p class="muted">This ticket is {{ ticket.status }} and can no longer be scanned.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

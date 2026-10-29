@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel narrow">
+  <h1>Conductor scanner</h1>
+  <p class="muted">Paste or scan a ticket code. Single-ride tickets are marked as used on the first valid scan.</p>
+  <form id="scan">
+    <label>Scanner key <input id="key" type="password" required autocomplete="off"></label>
+    <label>Bus route (optional) <input id="route_code" placeholder="e.g. R1"></label>
+    <label>Ticket code <input id="code" required placeholder="BP1.…"></label>
+    <button class="btn">Validate</button>
+  </form>
+  <div id="result" aria-live="polite"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById('scan').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const out = document.getElementById('result');
+    const r = await fetch('/api/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Conductor-Key': document.getElementById('key').value},
+      body: JSON.stringify({code: document.getElementById('code').value, route_code: document.getElementById('route_code').value || null})
+    });
+    const d = await r.json();
+    out.className = 'flash ' + (d.valid ? 'ok' : 'error');
+    out.textContent = d.valid
+      ? `✔ VALID — ${d.passenger}, ${d.pass_type} on ${d.route} (scan #${d.scans})`
+      : `✘ REJECTED — ${d.reason}`;
+  });
+</script>
+{% endblock %}

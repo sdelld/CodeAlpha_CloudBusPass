@@ -1,0 +1,40 @@
+# Local copy of the cloud architecture: load balancer -> N app servers -> PostgreSQL.
+# Scale the app tier up or down while it runs:
+#   docker compose up -d --scale app=5
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: buspass
+      POSTGRES_PASSWORD: buspass
+      POSTGRES_DB: buspass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buspass"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://buspass:buspass@db:5432/buspass
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      CONDUCTOR_KEY: ${CONDUCTOR_KEY:-conductor-dev-key}
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+
+  lb:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  pgdata:

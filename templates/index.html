@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Book bus tickets and passes online</h1>
+  <p>Tickets live in your account, so they can't be lost. Every QR code is cryptographically signed and single-use, so it can't be copied or forged. Prices are set by the server, never by the browser.</p>
+  <a class="btn" href="{{ url_for('book') }}">Book a ticket</a>
+</section>
+<h2>Routes</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Route</th><th>From</th><th>To</th><th>Departs</th><th>Single fare</th><th></th></tr></thead>
+  <tbody>
+  {% for r in routes %}
+    <tr>
+      <td><strong>{{ r.code }}</strong></td><td>{{ r.origin }}</td><td>{{ r.destination }}</td>
+      <td>{{ r.departure_time }}</td><td>{{ money(r.base_fare_cents) }}</td>
+      <td><a href="{{ url_for('book', route=r.id) }}">Book →</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<h2>Ticket types</h2>
+<div class="cards">
+  {% for key, p in PASS_TYPES.items() %}
+    <div class="card"><h3>{{ p.label }}</h3>
+      <p>{{ p.multiplier[0] / p.multiplier[1] }}× base fare · valid {{ p.days }} day{{ 's' if p.days > 1 }}
+      {{ '· one ride' if p.single_use else '· unlimited rides' }}</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

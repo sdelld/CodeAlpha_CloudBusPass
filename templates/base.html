@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CloudBus Pass{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ url_for('index') }}">🚌 CloudBus Pass</a>
+  <nav>
+    <a href="{{ url_for('index') }}">Routes</a>
+    {% if current_user %}
+      <a href="{{ url_for('book') }}">Book</a>
+      <a href="{{ url_for('my_tickets') }}">My tickets</a>
+      <form method="post" action="{{ url_for('logout') }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="link">Log out ({{ current_user.name }})</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('login') }}">Log in</a>
+      <a class="btn small" href="{{ url_for('register') }}">Sign up</a>
+    {% endif %}
+  </nav>
+</header>
+<main>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}
+    <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+<footer>CodeAlpha Cloud Computing — Task 3 · <a href="{{ url_for('conductor') }}">Conductor scanner</a></footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>
